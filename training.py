@@ -3,6 +3,7 @@ import inspect
 import seaborn as sns
 import matplotlib.pyplot as plt
 import pandas as pd
+from tqdm import tqdm
 
 import os
 
@@ -12,7 +13,8 @@ import torchinfo
 from model import GPT
 from config.config import GPTConfig
 from data_loader import DataLoaderLite
-from utils import get_lr
+from scripts.utils import get_lr
+from scripts.model_utils import save_checkpoint, load_weights, save_weights, prepare_model
 
 if torch.cuda.is_available():
   device = torch.device("cuda")
@@ -22,7 +24,6 @@ else:
   device = torch.device("cpu")
 
 print(f"Using device: {device}")
-
 
 from torchinfo import summary
 model = GPT(GPTConfig()).to(device)
@@ -43,22 +44,12 @@ train_loader = DataLoaderLite(B=B, T=T)
 #----------------------------------------------------------
 # Set precision for float and prepare the model
 torch.set_float32_matmul_precision('high')
-model.train()
 
-# Load weights if exist
+# Load weights if exist and prepare the model
 weights_path = "gpt2_model_weights.pth"
-if os.path.exists(weights_path):
-  try:
-    model.load_state_dict(torch.load(weights_path, map_location=device, weights_only=True))
-    print(f"Loaded weights from {weights_path}")
-  except Exception as e:
-    print(f"Failed to load weights: {e}. Starting with random weights.")
-else:
-  print(f"No weights found at {weights_path}. Starting with random weights.")
+model = load_weights(model, weights_path)
+model = prepare_model(model, device)
 
-model = torch.compile(model, backend="aot_eager")
-model.to(device)
-print("Model compiled!")
 torch.manual_seed(42)
 torch.mps.manual_seed(42)
 #----------------------------------------------------------
@@ -67,13 +58,18 @@ max_lr = 3e-3 # best used 3e-3
 min_lr = 3e-4 # best used 3e-5
 warmup_steps = 500 # best used 10
 max_steps = 8000 # best used 2000
+num_steps = 8000
 #----------------------------------------------------------
 print("Start training:")
 loss_history = []
-num_steps = 8000
+learning_rate_history = []
+norm_history = []
+tokens_per_sec_history = []
+
+start_time = time.time()
 # Do the optimization
 optimizer = torch.optim.AdamW(model.parameters(), lr=6e-4, betas=(0.9, 0.999), eps=1e-8, weight_decay=0.1)
-for step in range(num_steps):
+for step in tqdm(range(num_steps), desc="Training"):
   t0 = time.time()
   optimizer.zero_grad()
   loss_accum = 0
@@ -81,7 +77,7 @@ for step in range(num_steps):
       # get the next batch of data
       x, y = train_loader.next_batch()
       x, y = x.to(device), y.to(device)
-      with torch.autocast(device_type='mps', dtype=torch.float16):
+      with torch.autocast(device_type=device.type, dtype=torch.float16):
         logits, loss = model(x,y)
       loss = loss / grad_accum_steps
       loss_accum += loss.detach()
@@ -104,23 +100,69 @@ for step in range(num_steps):
   tokens_per_sec = tokens_processed / dt
 
   loss_history.append(loss_accum)
-  print(f"step {step} | loss: {loss_accum.item()} | lr: {lr} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/s: {tokens_per_sec:.2f}")
+  learning_rate_history.append(lr)
+  norm_history.append(norm)
+  tokens_per_sec_history.append(tokens_per_sec)
+
+  if step % 1000 == 0 and step != 0:
+    print(f"step {step} | loss: {loss_accum.item()} | lr: {lr} | norm: {norm:.4f} | dt: {dt*1000:.2f}ms | tok/s: {tokens_per_sec:.2f}")
+    save_checkpoint(model, optimizer, step, loss_accum)
+
+end_time = time.time()
+total_time = end_time - start_time
+print(f"Total training time: {total_time:.2f} seconds")
 
 
 #----------------------------------------------------------
 # Convert loss_history tensors to CPU and then to float
 loss_history_cpu = [item.cpu().item() for item in loss_history]
-# Plot loss curve
+learning_rate_history_cpu = learning_rate_history
+norm_history_cpu = [item.cpu().item() for item in norm_history]
+tokens_per_sec_history_cpu = tokens_per_sec_history
+
+# Create a DataFrame
 data = {
-  'Epoch': list(range(0,len(loss_history_cpu))),
-  'Loss': loss_history_cpu
+    'Epoch': list(range(len(loss_history_cpu))),
+    'Loss': loss_history_cpu,
+    'Learning Rate': learning_rate_history_cpu,
+    'Norm': norm_history_cpu,
+    'Tokens per Second': tokens_per_sec_history_cpu
 }
 df = pd.DataFrame(data)
-plt.figure(figsize=(10, 6))
-sns.lineplot(data=df, x='Epoch', y='Loss')
 
-# Customize the plot
+# Create and customize multiple plots
+plt.figure(1, figsize=(10, 6))
+sns.lineplot(data=df, x='Epoch', y='Loss')
 plt.title('Loss Over Time')
 plt.xlabel('Epoch')
 plt.ylabel('Loss')
 plt.grid(True)
+plt.savefig('trained_model/loss_plot.png')
+
+plt.figure(2, figsize=(10, 6))
+sns.lineplot(data=df, x='Epoch', y='Learning Rate')
+plt.title('Learning Rate Over Time')
+plt.xlabel('Epoch')
+plt.ylabel('Learning Rate')
+plt.grid(True)
+plt.savefig('trained_model/lr_plot.png')
+
+plt.figure(3, figsize=(10, 6))
+sns.lineplot(data=df, x='Epoch', y='Norm')
+plt.title('Gradient Norm Over Time')
+plt.xlabel('Epoch')
+plt.ylabel('Norm')
+plt.grid(True)
+plt.savefig('trained_model/norm_plot.png')
+
+plt.figure(4, figsize=(10, 6))
+sns.lineplot(data=df, x='Epoch', y='Tokens per Second')
+plt.title('Tokens per Second Over Time')
+plt.xlabel('Epoch')
+plt.ylabel('Tokens per Second')
+plt.grid(True)
+plt.savefig('trained_model/tokens_per_sec_plot.png')
+
+print("Plots saved in trained_model directory")
+#----------------------------------------------------------
+save_weights(model)

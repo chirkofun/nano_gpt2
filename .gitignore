@@ -51,6 +51,10 @@ build/
 *.swp
 *~.nib
 
+# Model files
+*.pth
+*.png
+
 # Python cache directories
 __pycache__/
 *.py[cod]

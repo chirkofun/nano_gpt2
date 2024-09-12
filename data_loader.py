@@ -7,7 +7,7 @@ class DataLoaderLite:
     self.T = T
 
     # load tokens form disk and store them in memory
-    with open('input.txt', 'r') as f:
+    with open('data/input.txt', 'r') as f:
       text = f.read()
     enc = tiktoken.get_encoding('gpt2')
     self.tokens = torch.tensor(enc.encode(text))
@@ -26,6 +26,5 @@ class DataLoaderLite:
     self.current_position += B * T
     # if loading the next batch would be out of bounss, then reset
     if self.current_position + self.B * self.T >= len(self.tokens):
-      print(self.current_position)
       self.current_position = 0
     return x, y
