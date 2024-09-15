@@ -34,7 +34,7 @@ Here is the loss plot of one of the previous trainings with 8000 iterations:
 
 As you can see, the output does not make any sense, which is expected. There are several reasons for that:
 - the model is undertrained, the whole dataset was not used because the training would take a lot of time on my hardware
-- the model is too small, because again the training would take a lot of time
+- the model is too small (not so deep, number of layers is only 4, embedding space size is only 128), because again the training would take a lot of time
 - the training process is not optimized (hyperparameters tuning), because again training takes a lot of time (lack of opprotunity to iterate quickly)
 
 ## Future work (TODO):
