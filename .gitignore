@@ -54,6 +54,7 @@ build/
 # Model files
 *.pth
 *.png
+*.bin
 
 # Python cache directories
 __pycache__/

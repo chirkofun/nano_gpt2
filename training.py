@@ -40,17 +40,19 @@ def print_training_stats(step, step_result):
 def train_loop(model, train_loader, optimizer, training_config, model_config, device):
     losses = []
     norms = []
+    total_tokens = 0
 
     print("Starting training...")
     start_time = time.time()
     for step in tqdm(range(training_config.num_steps), desc="Training"):
         step_result = train_step(model, train_loader, optimizer, training_config, device, step)
-        
+        total_tokens += step_result['processed_tokens']
         losses.append(step_result['loss'])
         norms.append(step_result['norm'])
 
         if step % training_config.print_interval == 0:
             print_training_stats(step, step_result)
+            print(f"Total tokens processed: {total_tokens}")
 
         if step % training_config.save_interval == 0 and step != 0:
             save_checkpoint(model, optimizer, step, step_result['loss'], path = model_config.checkpoints_path)

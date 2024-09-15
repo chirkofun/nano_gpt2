@@ -13,8 +13,7 @@ def train_step(model, train_loader, optimizer, training_config, device, step):
     loss_accum = 0.0
 
     for _ in range(training_config.grad_accumulation_steps):
-        x, y = train_loader.next_batch()
-        x, y = x.to(device), y.to(device)
+        x, y = train_loader.get_batch('train', device)
 
         with torch.autocast(device_type=device.type, dtype=torch.float16):
             logits, loss = model(x, y)
@@ -39,7 +38,8 @@ def train_step(model, train_loader, optimizer, training_config, device, step):
         'loss': loss.item(),
         'lr': lr,
         'norm': norm,
-        'tokens_per_sec': tokens_per_sec
+        'tokens_per_sec': tokens_per_sec,
+        'processed_tokens': processed_tokens
     }
 
     return step_result

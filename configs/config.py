@@ -22,14 +22,14 @@ class TrainingConfig:
   block_size: int = 64 # block size
   grad_accumulation_steps: int = 1 # gradient accumulation steps
 
-  num_steps: int = 8000 # number of steps
+  num_steps: int = 40000 # number of steps
   eval_interval: int = 100 # evaluate interval
   eval_iters: int = 100 # evaluate iterations
 
   max_lr: float = 3e-3 # max learning rate
   min_lr: float = 3e-4 # min learning rate
   warmup_steps: int = 500 # warmup steps
-  max_steps: int = 8000 # max number of iterations
+  max_steps: int = 40000 # max number of iterations
   optimizer_params: dict = field(default_factory=lambda: {
     'lr': 3e-4,
     'betas': (0.9, 0.95),
