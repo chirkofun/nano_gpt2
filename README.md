@@ -1,5 +1,5 @@
 # Nano GPT
-This code is about experiments with Nano-GPT developed by Andrej Karpathy.
+This code is about experiments with Nano-GPT developed by Andrej Karpathy. I have used implememntation of Nano-GPT from this repo: [Nano-GPT](https://github.com/karpathy/build-nanogpt), I have followed the code from [YouTube video](https://www.youtube.com/watch?v=l8pRSuU81PU) and built the whole structure afterwards by myself.
 
 ## Execution
 To successfuly train the model and use it for inference here are the steps:
